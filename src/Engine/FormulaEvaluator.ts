@@ -2,13 +2,18 @@ import Cell from "./Cell"
 import SheetMemory from "./SheetMemory"
 import { ErrorMessages } from "./GlobalDefinitions";
 
-
+// Enums
+enum Operator {
+  Add = '+',
+  Subtract = '-',
+  Multiply = '*',
+  Divide = '/'
+}
 
 export class FormulaEvaluator {
   // Define a function called update that takes a string parameter and returns a number
   private _errorOccured: boolean = false;
   private _errorMessage: string = "";
-  private _currentFormula: FormulaType = [];
   private _lastResult: number = 0;
   private _sheetMemory: SheetMemory;
   private _result: number = 0;
@@ -18,68 +23,152 @@ export class FormulaEvaluator {
     this._sheetMemory = memory;
   }
 
+
   /**
-    * place holder for the evaluator.   I am not sure what the type of the formula is yet 
-    * I do know that there will be a list of tokens so i will return the length of the array
-    * 
-    * I also need to test the error display in the front end so i will set the error message to
-    * the error messages found In GlobalDefinitions.ts
-    * 
-    * according to this formula.
-    * 
-    7 tokens partial: "#ERR",
-    8 tokens divideByZero: "#DIV/0!",
-    9 tokens invalidCell: "#REF!",
-  10 tokens invalidFormula: "#ERR",
-  11 tokens invalidNumber: "#ERR",
-  12 tokens invalidOperator: "#ERR",
-  13 missingParentheses: "#ERR",
-  0 tokens emptyFormula: "#EMPTY!",
-
-                    When i get back from my quest to save the world from the evil thing i will fix.
-                      (if you are in a hurry you can fix it yourself)
-                               Sincerely 
-                               Bilbo
-    * 
+    * Evaluates a formula and returns the result.
    */
-
   evaluate(formula: FormulaType) {
 
+    this._errorMessage = ErrorMessages.emptyFormula;
+    this._result = 0;
+    
+    // If formula is empty, return nothing.
+    if (formula.length === 0) {
+      return;
+    }
 
-    // set the this._result to the length of the formula
+    const values: number[] = [];
+    const operators: string[] = [];
+    const calculate = this.calculate.bind(this, values);
 
-    this._result = formula.length;
-    this._errorMessage = "";
+    // If not empty, iterate through each token.
+    for (const token of formula) {
+      // If token is a number, push it to the values array.
+      if (this.isNumber(token)) {
+        values.push(Number(token));
+      } 
+      // If token is a cell reference, push its value to the values array.
+      else if (this.isCellReference(token)) {
+        const [value, cellError] = this.getCellValue(token);
+        if (cellError) {
+          this._result = value;
+          this._errorMessage = cellError;
+        } else {
+          values.push(value);
+        }
+      } 
+      else {
+        this.handleToken(token, operators, calculate);
+      }
+    }
 
-    switch (formula.length) {
-      case 0:
-        this._errorMessage = ErrorMessages.emptyFormula;
+    // Calculate remaining operators.
+    while (operators.length) {
+      calculate(operators.pop()!);
+    }
+
+    // If there is only one value left, it is the result.
+    if (values.length === 1 && this._errorMessage !== ErrorMessages.invalidFormula) {
+      this._result = values[0];
+      this._errorMessage = "";
+    } else if (values.length === 0 && this._errorMessage === ErrorMessages.emptyFormula) {
+      this._result = 0;
+      this._errorMessage = ErrorMessages.missingParentheses;
+    } 
+  }
+
+  /**
+  * Handles a token in the formula.
+  * @param token - the token to handle
+  * @param operators - the array storing operators
+  * @param calculate - the function to calculate the result
+  */
+  handleToken(token: TokenType, operators: string[], calculate: (operator: string) => void) {
+    switch (token) {
+      case Operator.Add:
+      case Operator.Subtract:
+      case Operator.Multiply:
+      case Operator.Divide:
+        while (operators.length && this.getPrecedence(operators[operators.length - 1]) >= this.getPrecedence(token as string)) {
+          calculate(operators.pop()!);
+        }
+        operators.push(token as string);
         break;
-      case 7:
-        this._errorMessage = ErrorMessages.partial;
+      case '(':
+        operators.push(token as string);
         break;
-      case 8:
-        this._errorMessage = ErrorMessages.divideByZero;
-        break;
-      case 9:
-        this._errorMessage = ErrorMessages.invalidCell;
-        break;
-      case 10:
-        this._errorMessage = ErrorMessages.invalidFormula;
-        break;
-      case 11:
-        this._errorMessage = ErrorMessages.invalidNumber;
-        break;
-      case 12:
-        this._errorMessage = ErrorMessages.invalidOperator;
-        break;
-      case 13:
-        this._errorMessage = ErrorMessages.missingParentheses;
+      case ')':
+        while (operators.length && operators[operators.length - 1] !== '(') {
+          calculate(operators.pop()!);
+        }
+        operators.pop();
         break;
       default:
-        this._errorMessage = "";
-        break;
+        throw new Error(ErrorMessages.invalidFormula);
     }
+  }
+
+  /**
+   * Calculates the result of an operation.
+   * @param values - the array storing values
+   * @param operator - the operator to use
+   */
+  calculate(values: number[], operator: string) {
+    if (values.length === 0) {
+      return;
+    }
+    if (values.length < 2) {
+      this._errorMessage = ErrorMessages.invalidFormula;
+      this._result = values.pop()!;
+      return;
+
+    }
+    const right = values.pop()!;
+    const left = values.pop()!;
+
+    switch (operator) {
+      case Operator.Add:
+        values.push(left + right);
+        break;
+      case Operator.Subtract:
+        values.push(left - right);
+        break;
+      case Operator.Multiply:
+        values.push(left * right);
+        break;
+      case Operator.Divide:
+        if (right === 0) {
+          this._errorMessage = ErrorMessages.divideByZero;
+          this._result = Infinity;
+        } else {
+          values.push(left / right);
+        }
+        break;
+      default:
+        throw new Error(ErrorMessages.invalidFormula);
+      }
+    }
+  
+  /**
+   * Returns the precedence level of an operator.
+   * @param operator - the operator to check
+   * @returns the precedence level of the operator
+   */
+  getPrecedence(operator: string): number {
+    switch (operator) {
+      case Operator.Add:
+      case Operator.Subtract:
+        return 1;
+      case Operator.Multiply:
+      case Operator.Divide:
+        return 2;
+      default:
+        return 0;
+    }
+  }
+
+  public get errorOccured(): boolean {
+    return this._errorOccured;
   }
 
   public get error(): string {
@@ -90,8 +179,9 @@ export class FormulaEvaluator {
     return this._result;
   }
 
-
-
+  public get lastResult(): number {
+    return this._lastResult;
+  }
 
   /**
    * 
@@ -142,8 +232,6 @@ export class FormulaEvaluator {
     return [value, ""];
 
   }
-
-
 }
 
 export default FormulaEvaluator;
