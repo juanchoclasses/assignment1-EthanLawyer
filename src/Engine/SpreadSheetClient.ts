@@ -18,7 +18,7 @@ import { PortsGlobal } from '../PortsGlobal';
 class SpreadSheetClient {
     private _serverPort: number = PortsGlobal.serverPort;
     private _baseURL: string = `http://localhost:${this._serverPort}`;
-    private _userName: string = 'juancho';
+    private _userName: string;
     private _documentName: string = 'test';
     private _document: DocumentTransport;
 
@@ -185,6 +185,10 @@ class SpreadSheetClient {
      * @returns 
      */
     public setEditStatus(isEditing: boolean): void {
+        if (!this._userName) {
+            alert('Username is not set');
+            return;
+        }
 
         // request edit statut sof the current cell
         let requestEditViewURL = `${this._baseURL}/document/cell/view/${this._documentName}/${this._document.currentCell}`;
