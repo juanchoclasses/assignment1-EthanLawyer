@@ -213,6 +213,11 @@ class SpreadSheetClient {
 
 
     public addToken(token: string): void {
+
+        if (!this._userName) {
+            alert('Username is not set');
+            return;
+        }
  
         if (token === '/') {
             token = '%2F';
@@ -236,6 +241,12 @@ class SpreadSheetClient {
     }
 
     public addCell(cell: string): void {
+
+        if (!this._userName) {
+            alert('Username is not set');
+            return;
+        }
+
         const requestAddCellURL = `${this._baseURL}/document/addcell/${this._documentName}/${cell}`;
 
         fetch(requestAddCellURL, {
@@ -255,6 +266,12 @@ class SpreadSheetClient {
     }
 
     public removeToken(): void {
+
+        if (!this._userName) {
+            alert('Username is not set');
+            return;
+        }
+
         const requestRemoveTokenURL = `${this._baseURL}/document/removetoken/${this._documentName}`;
         fetch(requestRemoveTokenURL, {
             method: 'PUT',
@@ -272,6 +289,12 @@ class SpreadSheetClient {
     }
 
     public requestViewByLabel(label: string): void {
+
+        if (!this._userName) {
+            alert('Username is not set');
+            return;
+        }
+
         const requestViewURL = `${this._baseURL}/document/cell/view/${this._documentName}/${label}`;
         console.log(this._userName);
         fetch(requestViewURL, {
